@@ -1,0 +1,13 @@
+[project]
+name = "htp"
+version = "0.1.0"
+description = "High-throughput tools for Python: ssh and email helpers."
+authors = [
+    { name = "John Kitchin", email = "jkitchin@andrew.cmu.edu" }
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.8.0,<0.9"]
+build-backend = "uv_build"

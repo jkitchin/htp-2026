@@ -1,0 +1,77 @@
+#+TITLE: htp
+#+AUTHOR: John Kitchin
+
+=htp= is a small Python 3 package of high-throughput helpers. It is a modernized slice of the original =htp= project (https://github.com/jkitchin/htp), ported from Python 2 and reduced to two well-scoped utilities: running commands on a remote host via =ssh=, and sending email over SMTP with or without a file attachment.
+
+The package is packaged for =uv= and has no runtime dependencies outside the Python standard library.
+
+* Installation
+
+From the repository root:
+
+#+begin_src sh
+uv sync
+#+end_src
+
+or, to install into an existing environment:
+
+#+begin_src sh
+uv pip install .
+#+end_src
+
+* Running commands over ssh
+
+The =htp.ssh= module exposes a single function, =ssh(cmds, host, ssh_cmd=("ssh", "-x"))=. =cmds= can be either a single command string or any iterable of strings, which are joined with =;= and sent as one remote command. The return value is the pair =(status, output)=, where =output= is the combined stdout and stderr of the remote process. A non-zero exit status raises =SSHError= with the failed argv and captured output attached to the message.
+
+#+begin_src python
+from htp import ssh, SSHError
+
+status, output = ssh("uname -a", "user@host.example.com")
+print(output)
+
+try:
+    ssh(["cd /tmp", "ls missing"], "user@host.example.com")
+except SSHError as err:
+    print("remote command failed:", err)
+#+end_src
+
+Commands are passed to =subprocess.run= as an argv list rather than through a shell, so there is no shell interpolation of the =host= or =cmds= arguments on the local side. The remote side still executes the joined command string through the login shell on the remote host, which is what the original Python 2 version did as well.
+
+* Sending email
+
+The =htp.mail= module provides two functions. =send_mail(toaddrs, subject, message, fromaddr, mailserver)= sends a single plain-text message to one or more recipients. =toaddrs= may be either a single address or an iterable of addresses. =send_mail_with_attachment(fromaddr, toaddrs, subject, message, attachment, mailserver)= sends one message per recipient with the file at =attachment= included as an =application/octet-stream= part. One message is sent per recipient so that addresses are not exposed to each other in the headers.
+
+#+begin_src python
+from htp import send_mail, send_mail_with_attachment
+
+send_mail(
+    toaddrs=["alice@example.com", "bob@example.com"],
+    subject="nightly run finished",
+    message="All 42 jobs completed.",
+    fromaddr="runner@example.com",
+    mailserver="smtp.example.com",
+)
+
+send_mail_with_attachment(
+    fromaddr="runner@example.com",
+    toaddrs=["alice@example.com"],
+    subject="nightly run log",
+    message="Log attached.",
+    attachment="logs/2026-04-13.log",
+    mailserver="smtp.example.com",
+)
+#+end_src
+
+Both functions open the SMTP connection with =smtplib.SMTP= as a context manager and close it cleanly when the message has been handed off. Authentication and TLS are not wired in; if your mail server requires them, call =smtplib= directly or extend these helpers.
+
+* What is different from the original htp
+
+The original =ssh= helper shelled out through =os.popen= / =commands.getstatusoutput= and interpolated the host and command into a single shell string. This port switches to =subprocess.run= with an argv list, so local shell metacharacters in the arguments are not re-interpreted. The error class is renamed from =SSHerror= to =SSHError= to match PEP 8.
+
+The original =mail= module used the Python 2 =email.MIMEMultipart= and =email.Encoders= modules and referenced an undefined =MAILSERVER= global in its simple-send function. This port uses =email.mime.*= and =email.encoders=, takes =mailserver= as an explicit argument in both functions, and uses =with smtplib.SMTP(...)= so the connection is closed on failure. The simple-send function is renamed from =smptmail= (a typo in the original) to =send_mail=, and the attachment helper from =mail_attachment= to =send_mail_with_attachment=.
+
+Modules from the original project that have not been ported include =rsync=, =sftp2=, =crontab=, =SGE=, =queue_dacapo=, =queue_qn=, =remote_dacapo=, and =remote_qn=. Those tie into Jacapo, Torque, and SSH.com =sftp2=, which are not needed for the current use case.
+
+* Author
+
+John Kitchin, =jkitchin@andrew.cmu.edu=.
