@@ -15,3 +15,13 @@ html:
   use_repository_button: true
   use_issues_button: true
   use_edit_page_button: true
+
+sphinx:
+  extra_extensions:
+    - sphinx.ext.autodoc
+    - sphinx.ext.napoleon
+  config:
+    autodoc_typehints: description
+    autodoc_member_order: bysource
+    napoleon_google_docstring: false
+    napoleon_numpy_docstring: true
